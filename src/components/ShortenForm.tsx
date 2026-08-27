@@ -88,10 +88,15 @@ export const ShortenForm: React.FC<ShortenFormProps> = ({
         }),
       });
 
-      const data = await response.json();
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = { error: `Server returned status ${response.status} (${response.statusText || 'Error'})` };
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to shorten URL.');
+        throw new Error(data.error || `Failed to shorten URL (HTTP ${response.status})`);
       }
 
       onShortened(data);
@@ -99,7 +104,7 @@ export const ShortenForm: React.FC<ShortenFormProps> = ({
       setCustomCode('');
       setTitle('');
     } catch (err: any) {
-      setErrorMessage(err.message || 'An unexpected error occurred.');
+      setErrorMessage(err.message || 'An unexpected network error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

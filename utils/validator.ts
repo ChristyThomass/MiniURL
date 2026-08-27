@@ -8,23 +8,32 @@
  */
 export function validateUrl(rawUrl: string): { valid: boolean; normalized?: string; error?: string } {
   if (!rawUrl || typeof rawUrl !== 'string') {
-    return { valid: false, error: 'URL is required and must be a string.' };
+    return { valid: false, error: 'URL is required and cannot be empty.' };
   }
 
   let trimmed = rawUrl.trim();
+
+  if (!trimmed) {
+    return { valid: false, error: 'URL is required and cannot be empty.' };
+  }
 
   // Basic length constraint
   if (trimmed.length > 2048) {
     return { valid: false, error: 'URL is too long (maximum 2048 characters).' };
   }
 
-  // Prepend https:// if user omitted protocol for convenience, e.g. "github.com/foo"
+  // Check for prohibited dangerous script protocols
+  if (/^(javascript|data|file|vbscript|blob):/i.test(trimmed)) {
+    return { valid: false, error: 'Prohibited URL protocol (javascript:, data:, file: are not allowed).' };
+  }
+
+  // Prepend protocol if user omitted protocol for convenience, e.g. "google.com" or "localhost:3000"
   if (!/^https?:\/\//i.test(trimmed)) {
-    // Check if it's a dangerous protocol like javascript:, data:, file:
-    if (/^(javascript|data|file|vbscript|blob):/i.test(trimmed)) {
-      return { valid: false, error: 'Invalid or prohibited URL protocol.' };
+    if (/^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/.*)?$/i.test(trimmed)) {
+      trimmed = 'http://' + trimmed;
+    } else {
+      trimmed = 'https://' + trimmed;
     }
-    trimmed = 'https://' + trimmed;
   }
 
   try {
@@ -32,20 +41,27 @@ export function validateUrl(rawUrl: string): { valid: boolean; normalized?: stri
 
     // Protocol check: only http and https allowed
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return { valid: false, error: 'Only HTTP and HTTPS URLs are supported.' };
+      return { valid: false, error: 'Only standard HTTP and HTTPS web URLs are supported.' };
     }
 
     // Hostname check
     if (!parsed.hostname || parsed.hostname.length === 0) {
-      return { valid: false, error: 'URL must contain a valid domain name or IP address.' };
+      return { valid: false, error: 'URL must contain a valid domain name, host, or IP address.' };
     }
 
-    // Prevent loopback/localhost malicious redirect loops if desired, but allow for local testing
-    // Normalize href
     return { valid: true, normalized: parsed.href };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Invalid URL structure.';
-    return { valid: false, error: `Invalid URL format: ${message}` };
+  } catch {
+    // If standard URL constructor failed, try encoding spaces/special characters
+    try {
+      const encoded = encodeURI(trimmed);
+      const parsed = new URL(encoded);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return { valid: false, error: 'Only standard HTTP and HTTPS web URLs are supported.' };
+      }
+      return { valid: true, normalized: parsed.href };
+    } catch {
+      return { valid: false, error: 'Invalid URL format. Please enter a valid address like https://example.com' };
+    }
   }
 }
 
