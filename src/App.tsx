@@ -7,6 +7,13 @@ import { StatsModal } from './components/StatsModal';
 import { QrModal } from './components/QrModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ShortenResponse, UrlItem, GlobalMetrics } from './types';
+import {
+  getLocalStoredLinks,
+  saveLocalStoredLinks,
+  deleteLocalLink,
+  computeLocalMetrics,
+  recordLocalClick,
+} from './utils/clientLinkService';
 import { ShieldCheck, Zap, Database, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
@@ -63,26 +70,82 @@ export default function App() {
     }, 3000);
   };
 
-  // Fetch metrics and links from backend
+  // Client-side fallback check on mount for short code URL navigation
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const pathname = window.location.pathname.replace(/^\/+/, '');
+    if (pathname && !pathname.includes('.') && pathname !== 'api' && pathname !== 'history' && pathname !== 'shortener') {
+      // Check local storage or API
+      const localLinks = getLocalStoredLinks();
+      const matched = localLinks.find((l) => l.short_code === pathname);
+      if (matched) {
+        if (!matched.expires_at || new Date(matched.expires_at).getTime() > Date.now()) {
+          recordLocalClick(pathname);
+          window.location.href = matched.long_url;
+        }
+      }
+    }
+  }, []);
+
+  // Fetch metrics and links from backend with seamless fallback
   const fetchData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // Fetch top links & metrics
-      const topRes = await fetch('/api/analytics/top?limit=5');
-      if (topRes.ok) {
-        const topData = await topRes.json();
-        setTopLinks(topData.top_links || []);
-        setMetrics(topData.metrics || null);
+      let fetchedTop: UrlItem[] = [];
+      let fetchedAll: UrlItem[] = [];
+      let fetchedMetrics: GlobalMetrics | null = null;
+
+      // 1. Try API endpoints
+      try {
+        const [topRes, linksRes] = await Promise.all([
+          fetch('/api/analytics/top?limit=5'),
+          fetch('/api/links?limit=50'),
+        ]);
+
+        if (topRes.ok) {
+          const topData = await topRes.json();
+          fetchedTop = topData.top_links || [];
+          fetchedMetrics = topData.metrics || null;
+        }
+
+        if (linksRes.ok) {
+          const linksData = await linksRes.json();
+          fetchedAll = linksData.links || [];
+        }
+      } catch (err) {
+        console.warn('API data fetch failed, using local storage cache:', err);
       }
 
-      // Fetch all links list
-      const linksRes = await fetch('/api/links?limit=50');
-      if (linksRes.ok) {
-        const linksData = await linksRes.json();
-        setAllLinks(linksData.links || []);
-      }
+      // 2. Merge with locally stored links for seamless persistence
+      const localLinks = getLocalStoredLinks();
+      const combinedMap = new Map<string, UrlItem>();
+
+      // Put server links
+      fetchedAll.forEach((l) => combinedMap.set(l.short_code, l));
+      // Put local links if not already present
+      localLinks.forEach((l) => {
+        if (!combinedMap.has(l.short_code)) {
+          combinedMap.set(l.short_code, l);
+        }
+      });
+
+      const mergedList = Array.from(combinedMap.values());
+      // Sort by created_at or id
+      mergedList.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
+
+      // Save combined back to local storage
+      saveLocalStoredLinks(mergedList);
+
+      setAllLinks(mergedList);
+
+      // Compute top links
+      const sortedByClicks = [...mergedList].sort((a, b) => (b.click_count || 0) - (a.click_count || 0)).slice(0, 5);
+      setTopLinks(fetchedTop.length > 0 ? fetchedTop : sortedByClicks);
+
+      // Compute metrics
+      setMetrics(fetchedMetrics || computeLocalMetrics(mergedList));
     } catch (err) {
-      console.error('Error fetching links & metrics:', err);
+      console.error('Error in link synchronization:', err);
     } finally {
       setIsRefreshing(false);
     }
@@ -105,11 +168,14 @@ export default function App() {
 
   // Execute confirmed deletion
   const handleConfirmDelete = async (shortCode: string) => {
-    const res = await fetch(`/api/links/${shortCode}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(errJson.error || 'Failed to delete link.');
+    try {
+      await fetch(`/api/links/${shortCode}`, { method: 'DELETE' }).catch(() => {});
+    } catch {
+      // Ignore network errors for local deletion
     }
+
+    // Always delete from local storage
+    deleteLocalLink(shortCode);
 
     if (latestResult?.short_code === shortCode) {
       setLatestResult(null);

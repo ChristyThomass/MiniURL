@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link2, Sparkles, ChevronDown, ChevronUp, Clock, Tag, Wand2, AlertCircle, ArrowRight } from 'lucide-react';
 import { ShortenResponse } from '../types';
+import { createLocalShortLink } from '../utils/clientLinkService';
 
 interface ShortenFormProps {
   onShortened: (data: ShortenResponse) => void;
@@ -77,26 +78,45 @@ export const ShortenForm: React.FC<ShortenFormProps> = ({
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/shorten', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      let data: any = null;
+      try {
+        const response = await fetch('/api/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: trimmedUrl,
+            customCode: customCode.trim() || undefined,
+            title: title.trim() || undefined,
+            expiresAt: calculatedExpiresAt,
+          }),
+        });
+
+        if (response.ok) {
+          data = await response.json();
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          // If server returned a business validation error like duplicate custom code, throw it
+          if (response.status === 400 || response.status === 409) {
+            throw new Error(errData.error || `Failed to shorten URL (HTTP ${response.status})`);
+          }
+          // For 404 or 500, fallback to local storage
+          console.warn('Server API failed with status', response.status, '- Falling back to client-side link generator');
+        }
+      } catch (fetchErr: any) {
+        if (fetchErr.message && (fetchErr.message.includes('already in use') || fetchErr.message.includes('Invalid'))) {
+          throw fetchErr;
+        }
+        console.warn('API fetch error, using local fallback:', fetchErr);
+      }
+
+      // If server didn't succeed, generate locally
+      if (!data) {
+        data = createLocalShortLink({
           url: trimmedUrl,
           customCode: customCode.trim() || undefined,
           title: title.trim() || undefined,
           expiresAt: calculatedExpiresAt,
-        }),
-      });
-
-      let data: any = {};
-      try {
-        data = await response.json();
-      } catch {
-        data = { error: `Server returned status ${response.status} (${response.statusText || 'Error'})` };
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || `Failed to shorten URL (HTTP ${response.status})`);
+        });
       }
 
       onShortened(data);
@@ -104,7 +124,7 @@ export const ShortenForm: React.FC<ShortenFormProps> = ({
       setCustomCode('');
       setTitle('');
     } catch (err: any) {
-      setErrorMessage(err.message || 'An unexpected network error occurred. Please try again.');
+      setErrorMessage(err.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
