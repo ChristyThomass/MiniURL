@@ -1,0 +1,133 @@
+import { Router, Request, Response } from 'express';
+import { urlModel } from '../db/index';
+
+export const statsRouter = Router();
+
+/**
+ * GET /api/stats/:short_code
+ * Returns click_count, created_at, long_url, expires_at, and recent click analytics.
+ */
+statsRouter.get('/api/stats/:short_code', (req: Request, res: Response): void => {
+  try {
+    const { short_code } = req.params;
+    if (!short_code) {
+      res.status(400).json({ error: 'Short code is required.' });
+      return;
+    }
+
+    const stats = urlModel.getStats(short_code);
+    if (!stats.url) {
+      res.status(404).json({ error: `Short URL with code '${short_code}' not found.` });
+      return;
+    }
+
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const shortUrl = `${protocol}://${host}/${stats.url.short_code}`;
+
+    res.json({
+      short_code: stats.url.short_code,
+      short_url: shortUrl,
+      long_url: stats.url.long_url,
+      title: stats.url.title,
+      click_count: stats.url.click_count,
+      created_at: stats.url.created_at,
+      expires_at: stats.url.expires_at,
+      is_expired: stats.isExpired,
+      recent_clicks: stats.recentClicks.map(c => ({
+        id: c.id,
+        clicked_at: c.clicked_at,
+        user_agent: c.user_agent,
+        referrer: c.referrer,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Internal server error while fetching statistics.' });
+  }
+});
+
+/**
+ * GET /api/analytics/top
+ * Returns top 5 most-clicked links and global metrics.
+ */
+statsRouter.get('/api/analytics/top', (req: Request, res: Response): void => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 5, 20);
+    const topLinks = urlModel.getTopLinks(limit);
+    const metrics = urlModel.getGlobalMetrics();
+
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+
+    const formattedLinks = topLinks.map(link => ({
+      short_code: link.short_code,
+      short_url: `${protocol}://${host}/${link.short_code}`,
+      long_url: link.long_url,
+      title: link.title,
+      click_count: link.click_count,
+      created_at: link.created_at,
+      expires_at: link.expires_at,
+      is_expired: !!link.expires_at && new Date(link.expires_at).getTime() < Date.now(),
+    }));
+
+    res.json({
+      metrics,
+      top_links: formattedLinks,
+    });
+  } catch (error) {
+    console.error('Error fetching top analytics:', error);
+    res.status(500).json({ error: 'Internal server error while fetching analytics.' });
+  }
+});
+
+/**
+ * GET /api/links
+ * Returns recent links for the dashboard list.
+ */
+statsRouter.get('/api/links', (req: Request, res: Response): void => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    const links = urlModel.getAllLinks(limit);
+
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+
+    const formattedLinks = links.map(link => ({
+      short_code: link.short_code,
+      short_url: `${protocol}://${host}/${link.short_code}`,
+      long_url: link.long_url,
+      title: link.title,
+      click_count: link.click_count,
+      created_at: link.created_at,
+      expires_at: link.expires_at,
+      is_expired: !!link.expires_at && new Date(link.expires_at).getTime() < Date.now(),
+    }));
+
+    res.json({
+      links: formattedLinks,
+    });
+  } catch (error) {
+    console.error('Error fetching links:', error);
+    res.status(500).json({ error: 'Internal server error while fetching links.' });
+  }
+});
+
+/**
+ * DELETE /api/links/:short_code
+ * Delete short URL.
+ */
+statsRouter.delete('/api/links/:short_code', (req: Request, res: Response): void => {
+  try {
+    const { short_code } = req.params;
+    const deleted = urlModel.deleteByShortCode(short_code);
+    if (!deleted) {
+      res.status(404).json({ error: 'Link not found or already deleted.' });
+      return;
+    }
+    res.json({ success: true, message: `Link ${short_code} deleted successfully.` });
+  } catch (error) {
+    console.error('Error deleting link:', error);
+    res.status(500).json({ error: 'Internal server error while deleting link.' });
+  }
+});

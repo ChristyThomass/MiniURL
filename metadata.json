@@ -1,0 +1,6 @@
+{
+  "name": "URL Shortener",
+  "description": "A high-performance URL shortener with Base62 encoding, SQLite persistence, click analytics, and link expiration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
