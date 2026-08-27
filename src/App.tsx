@@ -161,27 +161,30 @@ export default function App() {
     setDeleteTargetCode(shortCode);
   };
 
-  // Execute confirmed deletion
-  const handleConfirmDelete = async (shortCode: string) => {
-    try {
-      await fetch(`/api/links/${shortCode}`, { method: 'DELETE' }).catch(() => {});
-    } catch {
-      // Ignore network errors for local deletion
-    }
-
-    // Always delete from local storage
+  // Execute confirmed deletion instantly
+  const handleConfirmDelete = (shortCode: string) => {
+    // 1. Instant local storage & optimistic UI updates
     deleteLocalLink(shortCode);
 
     if (latestResult?.short_code === shortCode) {
       setLatestResult(null);
     }
 
-    // Optimistic UI updates
-    setAllLinks((prev) => prev.filter((item) => item.short_code !== shortCode));
-    setTopLinks((prev) => prev.filter((item) => item.short_code !== shortCode));
+    setAllLinks((prev) => {
+      const updated = prev.filter((item) => item.short_code !== shortCode);
+      setMetrics(computeLocalMetrics(updated));
+      return updated;
+    });
 
-    showToast(`Short link /${shortCode} was permanently deleted.`);
-    fetchData();
+    setTopLinks((prev) => prev.filter((item) => item.short_code !== shortCode));
+    setDeleteTargetCode(null);
+
+    showToast(`Short link /${shortCode} deleted.`);
+
+    // 2. Background server cleanup (non-blocking)
+    fetch(`/api/links/${encodeURIComponent(shortCode)}`, { method: 'DELETE' }).catch((err) => {
+      console.warn('Background delete error:', err);
+    });
   };
 
   // If visitor is accessing a short URL code path (e.g. /xNKjad)

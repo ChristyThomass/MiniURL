@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Trash2, X, AlertTriangle, Loader2 } from 'lucide-react';
+import React from 'react';
+import { Trash2, X, AlertTriangle } from 'lucide-react';
 
 interface DeleteConfirmModalProps {
   shortCode: string | null;
   onClose: () => void;
-  onConfirm: (shortCode: string) => Promise<void>;
+  onConfirm: (shortCode: string) => void;
 }
 
 export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
@@ -12,21 +12,11 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   onClose,
   onConfirm,
 }) => {
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   if (!shortCode) return null;
 
-  const handleConfirm = async () => {
-    setIsDeleting(true);
-    setError(null);
-    try {
-      await onConfirm(shortCode);
-      onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to delete link.');
-      setIsDeleting(false);
-    }
+  const handleConfirm = () => {
+    onConfirm(shortCode);
+    onClose();
   };
 
   return (
@@ -45,8 +35,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            disabled={isDeleting}
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -61,15 +50,9 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
               <span className="font-mono font-bold bg-rose-100 dark:bg-rose-900/60 px-1 py-0.5 rounded">
                 /{shortCode}
               </span>{' '}
-              is irreversible. Anyone attempting to visit this short link in the future will receive a 404 Not Found error, and all historical click metrics will be purged.
+              is permanent. The link will be removed immediately.
             </div>
           </div>
-
-          {error && (
-            <div className="p-3 bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 text-xs rounded-xl">
-              {error}
-            </div>
-          )}
         </div>
 
         {/* Footer Actions */}
@@ -77,8 +60,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            disabled={isDeleting}
-            className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -86,20 +68,10 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             type="button"
             id="btn-confirm-delete-link"
             onClick={handleConfirm}
-            disabled={isDeleting}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-semibold rounded-xl transition-colors shadow-xs shadow-rose-200 dark:shadow-none cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-semibold rounded-xl transition-colors shadow-xs shadow-rose-200 dark:shadow-none cursor-pointer"
           >
-            {isDeleting ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Deleting...</span>
-              </>
-            ) : (
-              <>
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Permanently</span>
-              </>
-            )}
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Permanently</span>
           </button>
         </div>
       </div>
