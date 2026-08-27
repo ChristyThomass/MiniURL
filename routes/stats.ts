@@ -4,6 +4,51 @@ import { urlModel } from '../db/index';
 export const statsRouter = Router();
 
 /**
+ * GET /api/resolve/:short_code
+ * Quick resolver endpoint that logs telemetry and returns target long_url for client-side redirection
+ */
+statsRouter.get('/api/resolve/:short_code', (req: Request, res: Response): void => {
+  try {
+    const { short_code } = req.params;
+    if (!short_code) {
+      res.status(400).json({ error: 'Short code is required.' });
+      return;
+    }
+
+    const record = urlModel.findByShortCode(short_code);
+    if (!record) {
+      res.status(404).json({ error: 'Short URL not found.' });
+      return;
+    }
+
+    // Check expiration
+    if (record.expires_at && new Date(record.expires_at).getTime() <= Date.now()) {
+      res.status(410).json({ error: 'Short URL has expired.', is_expired: true, expires_at: record.expires_at });
+      return;
+    }
+
+    // Record click count
+    const userAgent = req.headers['user-agent'] || null;
+    const referrer = req.headers['referer'] || req.headers['referrer'] || null;
+    urlModel.recordClick(short_code, {
+      userAgent: typeof userAgent === 'string' ? userAgent.substring(0, 255) : null,
+      referrer: typeof referrer === 'string' ? referrer.substring(0, 255) : null,
+    });
+
+    res.json({
+      success: true,
+      short_code: record.short_code,
+      long_url: record.long_url,
+      title: record.title,
+    });
+  } catch (error) {
+    console.error('Error resolving short code:', error);
+    res.status(500).json({ error: 'Failed to resolve short code.' });
+  }
+});
+
+
+/**
  * GET /api/stats/:short_code
  * Returns click_count, created_at, long_url, expires_at, and recent click analytics.
  */

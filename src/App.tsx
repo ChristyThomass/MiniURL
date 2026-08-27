@@ -6,6 +6,7 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { StatsModal } from './components/StatsModal';
 import { QrModal } from './components/QrModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { RedirectView } from './components/RedirectView';
 import { ShortenResponse, UrlItem, GlobalMetrics } from './types';
 import {
   getLocalStoredLinks,
@@ -17,11 +18,22 @@ import {
 import { ShieldCheck, Zap, Database, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
+  // Check if current browser path is a short code redirect (e.g. /xNKjad)
+  const [redirectCode, setRedirectCode] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const pathname = window.location.pathname.replace(/^\/+/, '').trim();
+    if (pathname && !pathname.includes('.') && pathname !== 'api' && pathname !== 'history' && pathname !== 'shortener') {
+      return pathname;
+    }
+    return null;
+  });
+
   const [currentTab, setCurrentTab] = useState<'shortener' | 'history'>('shortener');
   const [latestResult, setLatestResult] = useState<ShortenResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
 
   // Theme Management (Light / Dark mode)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -69,23 +81,6 @@ export default function App() {
       setToastMessage(null);
     }, 3000);
   };
-
-  // Client-side fallback check on mount for short code URL navigation
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const pathname = window.location.pathname.replace(/^\/+/, '');
-    if (pathname && !pathname.includes('.') && pathname !== 'api' && pathname !== 'history' && pathname !== 'shortener') {
-      // Check local storage or API
-      const localLinks = getLocalStoredLinks();
-      const matched = localLinks.find((l) => l.short_code === pathname);
-      if (matched) {
-        if (!matched.expires_at || new Date(matched.expires_at).getTime() > Date.now()) {
-          recordLocalClick(pathname);
-          window.location.href = matched.long_url;
-        }
-      }
-    }
-  }, []);
 
   // Fetch metrics and links from backend with seamless fallback
   const fetchData = useCallback(async () => {
@@ -188,6 +183,21 @@ export default function App() {
     showToast(`Short link /${shortCode} was permanently deleted.`);
     fetchData();
   };
+
+  // If visitor is accessing a short URL code path (e.g. /xNKjad)
+  if (redirectCode) {
+    return (
+      <RedirectView
+        shortCode={redirectCode}
+        onGoHome={() => {
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', '/');
+          }
+          setRedirectCode(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100/60 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900 dark:selection:bg-indigo-950 dark:selection:text-indigo-200 transition-colors duration-200">
