@@ -2,6 +2,7 @@ export interface UrlItem {
   id?: number;
   short_code: string;
   short_url: string;
+  native_short_url?: string | null;
   long_url: string;
   title: string | null;
   click_count: number;
@@ -13,6 +14,7 @@ export interface UrlItem {
 export interface ShortenResponse {
   short_code: string;
   short_url: string;
+  native_short_url?: string | null;
   long_url: string;
   title: string | null;
   created_at: string;

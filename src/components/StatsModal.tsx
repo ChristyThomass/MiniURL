@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, BarChart3, Clock, Globe, ArrowUpRight, Activity, Calendar, ShieldAlert, Trash2 } from 'lucide-react';
+import { X, BarChart3, Clock, Globe, ArrowUpRight, Activity, Calendar, ShieldAlert, Trash2, ExternalLink } from 'lucide-react';
 import { UrlStatsResponse } from '../types';
+import { getNativeShortUrl } from '../utils/urlFormatter';
 
 interface StatsModalProps {
   shortCode: string | null;
@@ -76,17 +77,17 @@ export const StatsModal: React.FC<StatsModalProps> = ({ shortCode, onClose, onDe
           ) : stats ? (
             <>
               {/* Destination URL Box */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200/80 dark:border-slate-700">
-                <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200/80 dark:border-slate-700 space-y-2">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Destination</span>
                   <a
-                    href={stats.short_url}
+                    href={stats.long_url}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1 hover:underline"
                   >
-                    <span>Test Redirection</span>
-                    <ArrowUpRight className="w-3 h-3" />
+                    <span>Open Webpage</span>
+                    <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
                 <div className="font-mono text-xs text-slate-800 dark:text-slate-200 break-all select-all">{stats.long_url}</div>

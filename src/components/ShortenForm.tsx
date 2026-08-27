@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link2, Sparkles, ChevronDown, ChevronUp, Clock, Tag, Wand2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Link2, Sparkles, ChevronDown, ChevronUp, Clock, Tag, Wand2, AlertCircle, ArrowRight, Zap } from 'lucide-react';
 import { ShortenResponse } from '../types';
 import { createLocalShortLink } from '../utils/clientLinkService';
+import { getNativeShortUrl } from '../utils/urlFormatter';
 
 interface ShortenFormProps {
   onShortened: (data: ShortenResponse) => void;
@@ -21,6 +22,8 @@ export const ShortenForm: React.FC<ShortenFormProps> = ({
   const [expiryPreset, setExpiryPreset] = useState<'never' | '1h' | '24h' | '7d' | '30d' | 'custom'>('never');
   const [customExpiryDate, setCustomExpiryDate] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const nativePreview = longUrl.trim() ? getNativeShortUrl(longUrl) : null;
 
   const calculateExpiresAt = (): string | undefined => {
     const now = new Date();
@@ -184,6 +187,19 @@ export const ShortenForm: React.FC<ShortenFormProps> = ({
               )}
             </div>
           </div>
+
+          {/* Real-time Native Shortener Detection Indicator */}
+          {nativePreview?.nativeShortUrl && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/70 dark:border-emerald-900/60 px-3 py-1.5 rounded-xl animate-in fade-in">
+              <Zap className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="font-medium">
+                {nativePreview.serviceName} link detected: will generate{' '}
+                <strong className="font-mono text-emerald-800 dark:text-emerald-200 underline">
+                  {nativePreview.nativeShortUrl}
+                </strong>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Advanced Options Toggle */}

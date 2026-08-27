@@ -1,4 +1,5 @@
 import { ShortenResponse, UrlItem, GlobalMetrics } from '../types';
+import { getNativeShortUrl } from './nativeShortener';
 
 const STORAGE_KEY = 'miniurl_links_data';
 
@@ -46,6 +47,10 @@ export function createLocalShortLink(params: {
     targetUrl = 'https://' + targetUrl;
   }
 
+  // Detect native official short URL (e.g. YouTube -> youtu.be, Reddit -> redd.it)
+  const nativeInfo = getNativeShortUrl(targetUrl);
+  const nativeShortUrl = nativeInfo ? nativeInfo.nativeShortUrl : null;
+
   // Check custom code or generate random code
   let shortCode = params.customCode?.trim();
   if (!shortCode) {
@@ -55,6 +60,7 @@ export function createLocalShortLink(params: {
       return {
         short_code: existing.short_code,
         short_url: existing.short_url,
+        native_short_url: existing.native_short_url || nativeShortUrl,
         long_url: existing.long_url,
         title: existing.title,
         created_at: existing.created_at,
@@ -80,6 +86,7 @@ export function createLocalShortLink(params: {
   const newLink: UrlItem = {
     short_code: shortCode,
     short_url: shortUrl,
+    native_short_url: nativeShortUrl,
     long_url: targetUrl,
     title: params.title?.trim() || null,
     created_at: now,
@@ -94,6 +101,7 @@ export function createLocalShortLink(params: {
   return {
     short_code: newLink.short_code,
     short_url: newLink.short_url,
+    native_short_url: newLink.native_short_url,
     long_url: newLink.long_url,
     title: newLink.title,
     created_at: newLink.created_at,

@@ -14,6 +14,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { UrlItem, GlobalMetrics } from '../types';
+import { getNativeShortUrl, formatCleanShortUrl } from '../utils/urlFormatter';
 
 interface AnalyticsViewProps {
   topLinks: UrlItem[];
@@ -218,27 +219,36 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   {/* Metadata and Short Link reference */}
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400">Shortened as:</span>
-                      <a
-                        href={link.short_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                      >
-                        /{link.short_code}
-                      </a>
-                      <button
-                        onClick={() => handleCopy(link.short_url, link.short_code)}
-                        className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 ml-1 cursor-pointer"
-                        title="Copy short link"
-                      >
-                        {copiedCode === link.short_code ? (
-                          <Check className="w-3 h-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                        <span>{copiedCode === link.short_code ? 'Copied' : 'Copy'}</span>
-                      </button>
+                      <span className="text-[11px] text-slate-400">Short Link:</span>
+                      {(() => {
+                        const native = getNativeShortUrl(link.long_url);
+                        const displayUrl = native.nativeShortUrl || link.native_short_url || `https://min.url/${link.short_code}`;
+                        return (
+                          <>
+                            <a
+                              href={displayUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                            >
+                              <span>{displayUrl}</span>
+                              <ExternalLink className="w-3 h-3 opacity-60" />
+                            </a>
+                            <button
+                              onClick={() => handleCopy(displayUrl, link.short_code)}
+                              className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 ml-1 cursor-pointer"
+                              title="Copy clean short link"
+                            >
+                              {copiedCode === link.short_code ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                              <span>{copiedCode === link.short_code ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[11px]">
@@ -294,22 +304,27 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-sans">
                 {filteredLinks.map((link) => {
                   const isExpired = link.is_expired;
+                  const native = getNativeShortUrl(link.long_url);
+                  const cleanUrl = native.nativeShortUrl || link.native_short_url || `https://min.url/${link.short_code}`;
+
                   return (
                     <tr key={link.short_code} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                       {/* Short URL & Alias */}
                       <td className="px-5 py-3.5 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <a
-                            href={link.short_url}
+                            href={cleanUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="font-mono font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline"
+                            className="font-mono font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline inline-flex items-center gap-1"
+                            title={cleanUrl}
                           >
-                            /{link.short_code}
+                            <span>{native.nativeShortUrl ? native.nativeShortUrl.replace('https://', '') : `/${link.short_code}`}</span>
+                            <ExternalLink className="w-3 h-3 opacity-60" />
                           </a>
                         </div>
                         {link.title && (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[140px]">
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[160px]">
                             {link.title}
                           </div>
                         )}
@@ -352,7 +367,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                         <div className="flex items-center justify-end gap-1.5">
                           {/* Copy */}
                           <button
-                            onClick={() => handleCopy(link.short_url, link.short_code)}
+                            onClick={() => handleCopy(cleanUrl, link.short_code)}
                             className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
                             title="Copy Short URL"
                           >
@@ -365,7 +380,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
                           {/* Visit */}
                           <a
-                            href={link.short_url}
+                            href={cleanUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors"
@@ -376,7 +391,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
                           {/* QR Code */}
                           <button
-                            onClick={() => onOpenQr(link.short_url, link.title || link.short_code)}
+                            onClick={() => onOpenQr(cleanUrl, link.title || link.short_code)}
                             className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
                             title="Generate QR Code"
                           >
